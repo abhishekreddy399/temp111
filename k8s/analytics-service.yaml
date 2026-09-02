@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: civic-sense
+  labels:
+    app: analytics-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: abhi754/civicsense-analytics-service:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5004
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        envFrom:
+        - secretRef:
+            name: civic-secrets
+        env:
+        - name: PORT
+          value: "5004"
+        - name: NODE_ENV
+          value: "production"
+        - name: COMPLAINT_SERVICE_URL
+          value: "http://complaint-service:5002"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: civic-sense
+spec:
+  type: ClusterIP
+  selector:
+    app: analytics-service
+  ports:
+  - port: 5004
+    targetPort: 5004

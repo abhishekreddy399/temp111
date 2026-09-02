@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: complaint-service
+  namespace: civic-sense
+  labels:
+    app: complaint-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: complaint-service
+  template:
+    metadata:
+      labels:
+        app: complaint-service
+    spec:
+      containers:
+      - name: complaint-service
+        image: abhi754/civicsense-complaint-service:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5002
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        envFrom:
+        - secretRef:
+            name: civic-secrets
+        env:
+        - name: PORT
+          value: "5002"
+        - name: NODE_ENV
+          value: "production"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: complaint-service
+  namespace: civic-sense
+spec:
+  type: ClusterIP
+  selector:
+    app: complaint-service
+  ports:
+  - port: 5002
+    targetPort: 5002

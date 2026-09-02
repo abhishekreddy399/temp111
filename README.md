@@ -1,61 +1,100 @@
-# CivicSense - Smart Civic Issue Reporting Platform
+# CivicSense — Microservices Architecture
 
-A full-stack platform for citizens to report, track, and resolve civic issues using real-time maps and smart GPS detection.
-
-## Project Structure
-- **/my-app**: React frontend (built with Leaflet, Tailwind CSS, and Recharts)
-- **/backend**: Node.js & Express backend (MongoDB, Cloudinary for images, Nodemailer for notifications)
-
-## Quick Start
-
-### 1. Prerequisites
-- Node.js (v18+)
-- MongoDB (Local or Atlas)
-- Cloudinary Account (for image uploads)
-
-### 2. Backend Setup
-```bash
-cd backend
-npm install
-# Create a .env file based on .env.example
-npm start
-```
-
-### 3. Frontend Setup
-```bash
-cd my-app
-npm install
-npm start
-```
-
-## Features
-- **Interactive Leaflet Maps**: Real-time pinning and GPS auto-detection.
-- **Smart Status Tracking**: Visual markers on the map (Green for Resolved, Orange for Pending).
-- **Admin Dashboard**: Manage complaints and assign departments.
-- **Data Insights**: Comprehensive analytics for city infrastructure health.
-
-## 🚀 Deployment Guide
-
-### 1. Frontend (Vercel)
-- **Repo Link**: Connect this GitHub repo.
-- **Root Directory**: Select `my-app`.
-- **Framework Preset**: `Create React App`.
-- **Environment Variables**:
-  - `REACT_APP_API_URL`: Set this to your Railway Backend URL (e.g., `https://backend-production-xyz.up.railway.app`).
-
-### 2. Backend (Railway)
-- **Repo Link**: Connect this GitHub repo.
-- **Root Directory**: Select `backend`.
-- **Environment Variables**:
-  - `MONGO_URI`: Your MongoDB connection string.
-  - `JWT_SECRET`: A long random string.
-  - `CLOUDINARY_CLOUD_NAME`: (Required for photos)
-  - `CLOUDINARY_API_KEY`: (Required for photos)
-  - `CLOUDINARY_API_SECRET`: (Required for photos)
-  - `EMAIL_USER`: (For notifications)
-  - `EMAIL_PASS`: (For notifications)
-  - `CLIENT_URL`: Set to your Vercel URL (e.g., `https://civicsense.vercel.app`).
-  - `PORT`: (Railway sets this automatically, but you can default to 5000).
+CivicSense is a cloud-native, microservices-based civic issue reporting and resolution platform for smart cities.
 
 ---
-Built for Hackathon Project 2026.
+
+## 🏛️ System Architecture
+
+```text
+                                 ┌───────────────────────┐
+                                 │   Frontend (React)    │
+                                 └───────────┬───────────┘
+                                             │
+                                             ▼
+                                 ┌───────────────────────┐
+                                 │      API Gateway      │
+                                 │      (Port 5000)      │
+                                 └───────────┬───────────┘
+                                             │
+         ┌───────────────────┬───────────────┼───────────────┬───────────────────┐
+         │                   │               │               │                   │
+         ▼                   ▼               ▼               ▼                   ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│  Auth Service   │ │Complaint Service│ │  Admin Service  │ │Analytics Service│ │ legacy /backend │
+│   (Port 5001)   │ │   (Port 5002)   │ │   (Port 5003)   │ │   (Port 5004)   │ │   (Monolith)    │
+└────────┬────────┘ └────────┬────────┘ └────────┬────────┘ └────────┬────────┘ └─────────────────┘
+         │                   │                   │                   │
+         ▼                   ▼                   └─────────┬─────────┘
+  ┌──────────────┐    ┌──────────────┐                     │
+  │ civicsense_  │    │ civicsense_  │                     │ (HTTP REST API)
+  │ auth (MongoDB│    │complaints DB │ ◄───────────────────┘
+  └──────────────┘    └──────────────┘
+```
+
+---
+
+## 📁 Directory Layout
+
+- `services/api-gateway/`: Central entry point & reverse proxy router (Port 5000)
+- `services/auth-service/`: User authentication, JWT issuance, password hashing (Port 5001)
+- `services/complaint-service/`: Issue reporting, geocoding, Cloudinary uploads, email notifications (Port 5002)
+- `services/admin-service/`: Municipal admin operations via Complaint Service APIs (Port 5003)
+- `services/analytics-service/`: Statistical reporting & hotspot analytics via Complaint Service APIs (Port 5004)
+- `frontend/`: React + Vite SPA client (Port 80 / 3000)
+- `k8s/`: Kubernetes deployments, ClusterIP/NodePort services, & secret manifests
+- `infra/`: Terraform AWS Infrastructure provisioning
+- `docker-compose.yml`: Multi-container orchestrator for local development
+
+---
+
+## 🚀 Quick Start (Local Development)
+
+### Run all microservices using Docker Compose
+```bash
+docker-compose up --build
+```
+
+### Accessing Services
+- **Frontend App**: `http://localhost:80` (or `http://localhost:3000`)
+- **API Gateway**: `http://localhost:5000`
+- **Auth Service**: `http://localhost:5001`
+- **Complaint Service**: `http://localhost:5002`
+- **Admin Service**: `http://localhost:5003`
+- **Analytics Service**: `http://localhost:5004`
+- **MongoDB**: `localhost:27017`
+
+---
+
+## ⚓ Kubernetes Deployment
+
+### Deploy to Kubernetes Cluster
+```bash
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/secrets.yaml
+kubectl apply -f k8s/
+```
+
+### Exposed Kubernetes Ports (NodePort)
+- **Frontend**: `http://<Node-IP>:30080`
+- **API Gateway**: `http://<Node-IP>:30001`
+
+---
+
+## 🔐 Environment Variables
+
+Key service environment variables:
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `AUTH_SERVICE_URL` | Auth Microservice URL | `http://auth-service:5001` |
+| `COMPLAINT_SERVICE_URL` | Complaint Microservice URL | `http://complaint-service:5002` |
+| `ADMIN_SERVICE_URL` | Admin Microservice URL | `http://admin-service:5003` |
+| `ANALYTICS_SERVICE_URL` | Analytics Microservice URL | `http://analytics-service:5004` |
+| `AUTH_MONGODB_URI` | Auth MongoDB Database Connection | `mongodb://mongodb:27017/civicsense_auth` |
+| `COMPLAINT_MONGODB_URI` | Complaint MongoDB Database Connection | `mongodb://mongodb:27017/civicsense_complaints` |
+| `JWT_SECRET` | Secret key for JWT verification | `supersecretjwtkey` |
+
+---
+
+Built for Hackathon & Production DevOps Microservices Infrastructure.

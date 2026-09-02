@@ -1,28 +1,107 @@
 services:
-  # Backend API
-  backend:
-    build: ./backend
+  mongodb:
+    image: mongo:6.0
+    container_name: civicsense-mongodb
     ports:
-      - "5000:5000"
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: always
+
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: civicsense-api-gateway
+    ports:
+      - "5050:5000"
     environment:
       - PORT=5000
-      - NODE_ENV=production
-      - MONGO_URI=${MONGO_URI}
-      - JWT_SECRET=${JWT_SECRET}
+      - NODE_ENV=development
+      - AUTH_SERVICE_URL=http://auth-service:5001
+      - COMPLAINT_SERVICE_URL=http://complaint-service:5002
+      - ADMIN_SERVICE_URL=http://admin-service:5003
+      - ANALYTICS_SERVICE_URL=http://analytics-service:5004
+    depends_on:
+      - auth-service
+      - complaint-service
+      - admin-service
+      - analytics-service
+    restart: always
+
+  auth-service:
+    build: ./services/auth-service
+    container_name: civicsense-auth-service
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - NODE_ENV=development
+      - AUTH_MONGODB_URI=${AUTH_MONGODB_URI:-mongodb://mongodb:27017/civicsense_auth}
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
       - JWT_EXPIRE=7d
       - ADMIN_SECRET=${ADMIN_SECRET:-admin123}
-      - CLIENT_URL=${CLIENT_URL:-http://localhost:9090}
+    depends_on:
+      - mongodb
     restart: always
 
-  # Frontend UI
+  complaint-service:
+    build: ./services/complaint-service
+    container_name: civicsense-complaint-service
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - NODE_ENV=development
+      - COMPLAINT_MONGODB_URI=${COMPLAINT_MONGODB_URI:-mongodb://mongodb:27017/civicsense_complaints}
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME:-dummy_cloud}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-dummy_key}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET:-dummy_secret}
+      - EMAIL_USER=${EMAIL_USER:-dummy@example.com}
+      - EMAIL_PASS=${EMAIL_PASS:-dummy_pass}
+    depends_on:
+      - mongodb
+    restart: always
+
+  admin-service:
+    build: ./services/admin-service
+    container_name: civicsense-admin-service
+    ports:
+      - "5003:5003"
+    environment:
+      - PORT=5003
+      - NODE_ENV=development
+      - COMPLAINT_SERVICE_URL=http://complaint-service:5002
+      - AUTH_SERVICE_URL=http://auth-service:5001
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+    depends_on:
+      - complaint-service
+      - auth-service
+    restart: always
+
+  analytics-service:
+    build: ./services/analytics-service
+    container_name: civicsense-analytics-service
+    ports:
+      - "5004:5004"
+    environment:
+      - PORT=5004
+      - NODE_ENV=development
+      - COMPLAINT_SERVICE_URL=http://complaint-service:5002
+    depends_on:
+      - complaint-service
+    restart: always
+
   frontend:
     build:
-      context: ./my-app
+      context: ./frontend
       args:
-        - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:5000}
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:5050}
+    container_name: civicsense-frontend
     ports:
-      - "80:80"
+      - "3000:80"
     depends_on:
-      - backend
+      - api-gateway
     restart: always
 
+volumes:
+  mongo-data:

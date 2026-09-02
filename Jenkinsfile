@@ -2,12 +2,11 @@ pipeline {
     agent any
 
     environment {
-        // You need to add a "Username with password" credential in Jenkins called 'dockerhub-creds'
+        // "Username with password" credential in Jenkins called 'dockerhub-creds'
         DOCKERHUB_CREDS = credentials('dockerhub-creds') 
         
         // Configuration
         EC2_USER = "ubuntu"
-        // Replace this with your Master Node's Public IP
         EC2_IP = "32.198.67.137" 
         SSH_CRED_ID = "ec2-ssh-key"
         DEPLOY_PATH = "/home/${EC2_USER}/civic-sense"
@@ -27,28 +26,57 @@ pipeline {
             }
         }
 
-        stage('Build & Push Docker Images') {
+        stage('Build & Push Microservices') {
             parallel {
-                stage('Backend') {
+                stage('API Gateway') {
                     steps {
-                        sh "docker build -t abhi754/civicsense-backend:${BUILD_NUMBER} ./backend"
-                        sh "docker push abhi754/civicsense-backend:${BUILD_NUMBER}"
+                        sh "docker build -t abhi754/civicsense-api-gateway:${BUILD_NUMBER} -t abhi754/civicsense-api-gateway:latest ./services/api-gateway"
+                        sh "docker push abhi754/civicsense-api-gateway:${BUILD_NUMBER}"
+                        sh "docker push abhi754/civicsense-api-gateway:latest"
+                    }
+                }
+                stage('Auth Service') {
+                    steps {
+                        sh "docker build -t abhi754/civicsense-auth-service:${BUILD_NUMBER} -t abhi754/civicsense-auth-service:latest ./services/auth-service"
+                        sh "docker push abhi754/civicsense-auth-service:${BUILD_NUMBER}"
+                        sh "docker push abhi754/civicsense-auth-service:latest"
+                    }
+                }
+                stage('Complaint Service') {
+                    steps {
+                        sh "docker build -t abhi754/civicsense-complaint-service:${BUILD_NUMBER} -t abhi754/civicsense-complaint-service:latest ./services/complaint-service"
+                        sh "docker push abhi754/civicsense-complaint-service:${BUILD_NUMBER}"
+                        sh "docker push abhi754/civicsense-complaint-service:latest"
+                    }
+                }
+                stage('Admin Service') {
+                    steps {
+                        sh "docker build -t abhi754/civicsense-admin-service:${BUILD_NUMBER} -t abhi754/civicsense-admin-service:latest ./services/admin-service"
+                        sh "docker push abhi754/civicsense-admin-service:${BUILD_NUMBER}"
+                        sh "docker push abhi754/civicsense-admin-service:latest"
+                    }
+                }
+                stage('Analytics Service') {
+                    steps {
+                        sh "docker build -t abhi754/civicsense-analytics-service:${BUILD_NUMBER} -t abhi754/civicsense-analytics-service:latest ./services/analytics-service"
+                        sh "docker push abhi754/civicsense-analytics-service:${BUILD_NUMBER}"
+                        sh "docker push abhi754/civicsense-analytics-service:latest"
                     }
                 }
                 stage('Frontend') {
                     steps {
-                        // Build & Push Frontend with Vite environment variable
-                        sh "docker build --no-cache --build-arg VITE_API_URL=http://${EC2_IP}:30001 -t abhi754/civicsense-frontend:${BUILD_NUMBER} ./my-app"
+                        sh "docker build --no-cache --build-arg VITE_API_URL=http://${EC2_IP}:30001 -t abhi754/civicsense-frontend:${BUILD_NUMBER} -t abhi754/civicsense-frontend:latest ./frontend"
                         sh "docker push abhi754/civicsense-frontend:${BUILD_NUMBER}"
+                        sh "docker push abhi754/civicsense-frontend:latest"
                     }
                 }
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy Microservices to Kubernetes') {
             steps {
                 sshagent([SSH_CRED_ID]) {
-                    echo "Deploying to Kubernetes Cluster on Master Node (${EC2_IP})..."
+                    echo "Deploying microservices to Kubernetes Cluster on Master Node (${EC2_IP})..."
                     
                     // 1. Ensure directory exists on the Master Node
                     sh "ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} 'mkdir -p ${DEPLOY_PATH}/k8s'"
@@ -56,28 +84,29 @@ pipeline {
                     // 2. Copy the Kubernetes YAML files to the Master Node
                     sh "scp -o StrictHostKeyChecking=no k8s/*.yaml ${EC2_USER}@${EC2_IP}:${DEPLOY_PATH}/k8s/"
                     
-                    // 3. Tell Kubernetes to apply the changes
+                    // 3. Apply manifests & update container images
                     sh """
                         ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
                             cd ${DEPLOY_PATH}
-                            # Create namespace first and wait for it to be ready
                             kubectl apply -f k8s/namespace.yaml
                             sleep 2
                             
-                            # CLEAN UP CONFLICTING OLD SERVICES that hold port 30080 or 30001
-                            kubectl delete svc civic-frontend-service --namespace default || true
+                            # Clean up old monolithic backend service if present
                             kubectl delete svc civic-backend-service --namespace default || true
                             
-                            # Now apply the rest of the resources
-                            kubectl apply -f k8s/ || true
+                            # Apply all Kubernetes manifests
+                            kubectl apply -f k8s/
                             
-                            # FORCE KUBERNETES TO USE THE BRAND NEW DOCKER IMAGE
-                            kubectl set image deployment/civic-frontend frontend=abhi754/civicsense-frontend:${BUILD_NUMBER} -n civic-sense
-                            kubectl set image deployment/civic-backend backend=abhi754/civicsense-backend:${BUILD_NUMBER} -n civic-sense
+                            # Update deployment images to current build
+                            kubectl set image deployment/api-gateway api-gateway=abhi754/civicsense-api-gateway:${BUILD_NUMBER} -n civic-sense || true
+                            kubectl set image deployment/auth-service auth-service=abhi754/civicsense-auth-service:${BUILD_NUMBER} -n civic-sense || true
+                            kubectl set image deployment/complaint-service complaint-service=abhi754/civicsense-complaint-service:${BUILD_NUMBER} -n civic-sense || true
+                            kubectl set image deployment/admin-service admin-service=abhi754/civicsense-admin-service:${BUILD_NUMBER} -n civic-sense || true
+                            kubectl set image deployment/analytics-service analytics-service=abhi754/civicsense-analytics-service:${BUILD_NUMBER} -n civic-sense || true
+                            kubectl set image deployment/civic-frontend frontend=abhi754/civicsense-frontend:${BUILD_NUMBER} -n civic-sense || true
                             
-                            # Force a restart
-                            kubectl rollout restart deployment civic-frontend -n civic-sense
-                            kubectl rollout restart deployment civic-backend -n civic-sense
+                            # Restart deployments
+                            kubectl rollout restart deployment -n civic-sense
                         '
                     """
                 }
@@ -87,10 +116,10 @@ pipeline {
 
     post {
         success {
-            echo 'Kubernetes Deployment successful! 🎉'
+            echo 'Microservices Kubernetes Deployment successful! 🎉'
         }
         failure {
-            echo 'Deployment failed. Check Jenkins logs.'
+            echo 'Deployment failed. Check Jenkins build logs.'
         }
     }
 }
