@@ -48,10 +48,10 @@ metadata:
   name: api-gateway
   namespace: civic-sense
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: api-gateway
   ports:
-  - port: 5000
-    targetPort: 5000
-    nodePort: 30001
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
