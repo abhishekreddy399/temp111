@@ -132,13 +132,8 @@ export default function App() {
       setShowAuthModal(false);
       toast.success(`Welcome back, ${userData.name || 'User'}!`);
     } catch (err) {
-      // Mock login fallback if dev backend offline
-      const mockUser = { name: authForm.name || authForm.email.split('@')[0] || 'User', email: authForm.email, role: authForm.role };
-      localStorage.setItem('civic_token', 'mock_jwt_token_123');
-      localStorage.setItem('civic_user', JSON.stringify(mockUser));
-      setUser(mockUser);
-      setShowAuthModal(false);
-      toast.success(`Signed in as ${mockUser.name}`);
+      const errorMsg = err.response?.data?.message || err.message || 'Authentication failed. Please check your credentials.';
+      toast.error(errorMsg);
     }
   };
 

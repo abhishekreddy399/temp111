@@ -7,7 +7,7 @@ pipeline {
         
         // Configuration
         EC2_USER = "ubuntu"
-        EC2_IP = "32.198.67.137" 
+        EC2_IP = "3.238.241.182" 
         SSH_CRED_ID = "ec2-ssh-key"
         DEPLOY_PATH = "/home/${EC2_USER}/civic-sense"
     }
@@ -65,7 +65,7 @@ pipeline {
                 }
                 stage('Frontend') {
                     steps {
-                        sh "docker build --no-cache --build-arg VITE_API_URL=http://${EC2_IP}:30001 -t abhi754/civicsense-frontend:${BUILD_NUMBER} -t abhi754/civicsense-frontend:latest ./frontend"
+                        sh "docker build --no-cache --build-arg VITE_API_URL='' -t abhi754/civicsense-frontend:${BUILD_NUMBER} -t abhi754/civicsense-frontend:latest ./frontend"
                         sh "docker push abhi754/civicsense-frontend:${BUILD_NUMBER}"
                         sh "docker push abhi754/civicsense-frontend:latest"
                     }
