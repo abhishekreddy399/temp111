@@ -48,21 +48,25 @@ const ANALYTICS_SERVICE_URL = process.env.ANALYTICS_SERVICE_URL || 'http://analy
 app.use('/api/auth', createProxyMiddleware({
     target: AUTH_SERVICE_URL,
     changeOrigin: true,
+    pathRewrite: { '^/api/auth': '/api/auth' },
 }));
 
 app.use('/api/complaints', createProxyMiddleware({
     target: COMPLAINT_SERVICE_URL,
     changeOrigin: true,
+    pathRewrite: { '^/api/complaints': '/api/complaints' },
 }));
 
 app.use('/api/admin', createProxyMiddleware({
     target: ADMIN_SERVICE_URL,
     changeOrigin: true,
+    pathRewrite: { '^/api/admin': '/api/admin' },
 }));
 
 app.use('/api/analytics', createProxyMiddleware({
     target: ANALYTICS_SERVICE_URL,
     changeOrigin: true,
+    pathRewrite: { '^/api/analytics': '/api/analytics' },
 }));
 
 // Fallback 404 handler
