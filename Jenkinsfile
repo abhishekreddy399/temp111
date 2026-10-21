@@ -7,7 +7,7 @@ pipeline {
         
         // Configuration
         EC2_USER = "ubuntu"
-        EC2_IP = "34.204.183.138" 
+        EC2_IP = "98.82.137.106" 
         SSH_CRED_ID = "ec2-ssh-key"
         DEPLOY_PATH = "/home/${EC2_USER}/civic-sense"
     }
